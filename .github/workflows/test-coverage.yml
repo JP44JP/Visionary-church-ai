@@ -1,0 +1,251 @@
+name: Test Coverage Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  coverage-analysis:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: visionarychurch_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for SonarQube
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Setup test environment
+      run: |
+        cp .env.example .env.test
+        echo "DATABASE_URL=postgresql://test:test@localhost:5432/visionarychurch_test" >> .env.test
+        echo "REDIS_URL=redis://localhost:6379" >> .env.test
+        npm run setup:test-db
+
+    - name: Run all tests with coverage
+      run: npm run test:ci
+      env:
+        CI: true
+        DATABASE_URL: postgresql://test:test@localhost:5432/visionarychurch_test
+        REDIS_URL: redis://localhost:6379
+
+    - name: Generate coverage badge
+      uses: jaywcjlove/coverage-badges-cli@main
+      with:
+        source: coverage/coverage-summary.json
+        output: coverage/badge.svg
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage/lcov.info
+        name: full-coverage
+        fail_ci_if_error: true
+
+    - name: SonarQube Scan
+      uses: sonarqube-quality-gate-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+    - name: Upload to SonarQube
+      uses: SonarSource/sonarqube-scan-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    - name: Check coverage thresholds
+      run: |
+        npm run coverage:check
+        if [ $? -ne 0 ]; then
+          echo "❌ Coverage thresholds not met"
+          exit 1
+        fi
+        echo "✅ Coverage thresholds met"
+
+    - name: Generate coverage report
+      run: |
+        mkdir -p coverage-report
+        npm run coverage:html
+        cp coverage/index.html coverage-report/
+        
+        # Generate diff coverage for PRs
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          npm run coverage:diff
+        fi
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coverage-report/
+
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          try {
+            const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json'));
+            const total = coverage.total;
+            
+            const coverageComment = `## 📊 Code Coverage Report
+            
+            | Type | Percentage | Covered/Total |
+            |------|------------|---------------|
+            | Lines | ${total.lines.pct}% | ${total.lines.covered}/${total.lines.total} |
+            | Functions | ${total.functions.pct}% | ${total.functions.covered}/${total.functions.total} |
+            | Branches | ${total.branches.pct}% | ${total.branches.covered}/${total.branches.total} |
+            | Statements | ${total.statements.pct}% | ${total.statements.covered}/${total.statements.total} |
+            
+            ### Coverage by Category
+            - 🧪 **Unit Tests**: ${coverage.unit?.lines.pct || 'N/A'}%
+            - 🔗 **Integration Tests**: ${coverage.integration?.lines.pct || 'N/A'}%
+            - 🎨 **Component Tests**: ${coverage.components?.lines.pct || 'N/A'}%
+            - 🔒 **Security Tests**: ${coverage.security?.lines.pct || 'N/A'}%
+            
+            ${total.lines.pct >= 80 ? '✅' : '❌'} **Overall Coverage**: ${total.lines.pct >= 80 ? 'Meets' : 'Below'} minimum threshold (80%)
+            
+            [View detailed coverage report](https://app.codecov.io/gh/${{ github.repository }}/pull/${{ github.event.pull_request.number }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: coverageComment
+            });
+          } catch (error) {
+            console.error('Error reading coverage data:', error);
+          }
+
+  mutation-testing:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm install -g stryker-cli
+
+    - name: Run mutation testing
+      run: |
+        npx stryker run
+      continue-on-error: true
+
+    - name: Upload mutation test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: mutation-test-results
+        path: reports/mutation/
+
+  visual-regression:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright
+      run: npx playwright install --with-deps chromium
+
+    - name: Build application
+      run: npm run build
+
+    - name: Run visual regression tests
+      run: npx playwright test --grep="visual"
+
+    - name: Upload visual diffs
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: visual-regression-diffs
+        path: test-results/
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Check for vulnerabilities
+      run: |
+        npm audit --audit-level=moderate
+        npx yarn audit --level moderate || true
+
+    - name: Check dependency licenses
+      run: |
+        npm install -g license-checker
+        license-checker --production --csv --out licenses.csv
+        license-checker --production --excludePackages "mit,apache-2.0,bsd-2-clause,bsd-3-clause,isc" --failOn "gpl,lgpl,agpl"
+
+    - name: Upload license report
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-report
+        path: licenses.csv

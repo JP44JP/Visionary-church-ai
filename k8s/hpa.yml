@@ -1,0 +1,171 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: church-api-hpa
+  namespace: visionary-church
+  labels:
+    app: church-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: church-api
+  minReplicas: 5
+  maxReplicas: 100
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metric: HTTP requests per second
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  # Custom metric: Database connections
+  - type: Pods
+    pods:
+      metric:
+        name: database_connections
+      target:
+        type: AverageValue
+        averageValue: "50"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
+      - type: Pods
+        value: 10
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: church-worker-hpa
+  namespace: visionary-church
+  labels:
+    app: church-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: church-worker
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Queue-based scaling
+  - type: Pods
+    pods:
+      metric:
+        name: queue_length
+      target:
+        type: AverageValue
+        averageValue: "10"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 120
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 5
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# Vertical Pod Autoscaler (VPA) for resource optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: church-api-vpa
+  namespace: visionary-church
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: church-api
+  updatePolicy:
+    updateMode: "Off"  # Set to "Auto" for automatic updates
+  resourcePolicy:
+    containerPolicies:
+    - containerName: api
+      minAllowed:
+        cpu: 100m
+        memory: 256Mi
+      maxAllowed:
+        cpu: 2000m
+        memory: 4Gi
+      controlledResources: ["cpu", "memory"]
+
+---
+# PodDisruptionBudget to ensure availability during updates
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: church-api-pdb
+  namespace: visionary-church
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: church-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: church-worker-pdb
+  namespace: visionary-church
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: church-worker

@@ -1,0 +1,44 @@
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="50%" stop-color="#9333EA" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main logo shape - Abstract church/vision symbol -->
+  <path d="M24 4C32 4 38 10 38 18C38 26 32 32 24 32C16 32 10 26 10 18C10 10 16 4 24 4Z" 
+        fill="url(#brandGradient)" />
+  
+  <!-- Inner vision symbol -->
+  <circle cx="24" cy="18" r="6" fill="rgba(255,255,255,0.2)" />
+  
+  <!-- AI connection nodes -->
+  <circle cx="18" cy="15" r="2" fill="url(#accentGradient)" />
+  <circle cx="30" cy="15" r="2" fill="url(#accentGradient)" />
+  <circle cx="24" cy="25" r="2" fill="url(#accentGradient)" />
+  
+  <!-- Connection lines -->
+  <path d="M20 16L28 16M24 20L24 23" 
+        stroke="rgba(255,255,255,0.6)" 
+        stroke-width="1.5" 
+        stroke-linecap="round" />
+  
+  <!-- Foundation/base -->
+  <path d="M12 36C12 34 16 32 24 32C32 32 36 34 36 36C36 38 32 40 24 40C16 40 12 38 12 36Z" 
+        fill="#9333EA" 
+        opacity="0.6" />
+  
+  <!-- VC initials integrated -->
+  <text x="24" y="20" 
+        text-anchor="middle" 
+        fill="white" 
+        font-family="Inter, system-ui, sans-serif"
+        font-size="8" 
+        font-weight="bold">VC</text>
+</svg>

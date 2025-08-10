@@ -1,0 +1,161 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: church-api-ingress
+  namespace: visionary-church
+  annotations:
+    # NGINX Ingress Controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # SSL/TLS Configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "10"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:;" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    
+    # WebSocket support
+    nginx.ingress.kubernetes.io/websocket-services: "church-api-internal"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    
+    # Load balancing
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://visionarychurch.ai,https://*.visionarychurch.ai"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    
+    # Request size
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    
+    # Health checks
+    nginx.ingress.kubernetes.io/health-check-path: "/health"
+    nginx.ingress.kubernetes.io/health-check-interval: "30"
+    nginx.ingress.kubernetes.io/health-check-timeout: "10"
+
+spec:
+  tls:
+  - hosts:
+    - api.visionarychurch.ai
+    - "*.visionarychurch.ai"
+    - visionarychurch.ai
+    secretName: church-tls-secret
+  
+  rules:
+  # API subdomain
+  - host: api.visionarychurch.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: church-api-internal
+            port:
+              number: 3000
+  
+  # Wildcard for tenant subdomains
+  - host: "*.visionarychurch.ai"
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: church-api-internal
+            port:
+              number: 3000
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: church-api-internal
+            port:
+              number: 3000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: church-frontend-service
+            port:
+              number: 80
+
+---
+# Staging Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: church-api-ingress-staging
+  namespace: visionary-church-staging
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/websocket-services: "church-api-internal-staging"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/health-check-path: "/health"
+
+spec:
+  tls:
+  - hosts:
+    - staging-api.visionarychurch.ai
+    - "*.staging.visionarychurch.ai"
+    secretName: church-tls-secret-staging
+  
+  rules:
+  - host: staging-api.visionarychurch.ai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: church-api-internal-staging
+            port:
+              number: 3000
+  
+  - host: "*.staging.visionarychurch.ai"
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: church-api-internal-staging
+            port:
+              number: 3000
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: church-api-internal-staging
+            port:
+              number: 3000

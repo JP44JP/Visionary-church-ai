@@ -1,0 +1,415 @@
+# Datadog APM Configuration for VisionaryChurch-AI
+# Comprehensive application performance monitoring setup
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datadog-config
+  namespace: visionary-church
+  labels:
+    app: datadog
+data:
+  datadog.yaml: |
+    # =============================================================================
+    # DATADOG AGENT CONFIGURATION
+    # =============================================================================
+    
+    # API Configuration
+    api_key: "${DD_API_KEY}"
+    site: "datadoghq.com"
+    
+    # Hostname and Tags
+    hostname: "k8s-cluster"
+    tags:
+      - "env:${DD_ENV}"
+      - "service:visionary-church-ai"
+      - "version:${DD_VERSION}"
+      - "cluster:production"
+      - "region:us-east-1"
+    
+    # =============================================================================
+    # APM CONFIGURATION
+    # =============================================================================
+    apm_config:
+      enabled: true
+      env: "${DD_ENV}"
+      receiver_port: 8126
+      max_traces_per_second: 50
+      analyzed_spans:
+        "church-api|express.request": 1.0
+        "chat-widget|websocket.connection": 1.0
+        "prayer-system|database.query": 1.0
+        "visit-planning|email.send": 1.0
+        "event-management|payment.process": 1.0
+        "follow-up|sms.send": 1.0
+      
+      # Trace sampling rules
+      trace_sample_rate: 0.5
+      max_events_per_second: 200
+      
+      # Service mapping
+      service_mapping:
+        postgres: "postgresql"
+        redis: "redis"
+        elasticsearch: "elasticsearch"
+    
+    # =============================================================================
+    # LOGS CONFIGURATION  
+    # =============================================================================
+    logs_config:
+      enabled: true
+      container_collect_all: true
+      source: "kubernetes"
+      service: "visionary-church-ai"
+      
+      # Processing rules
+      processing_rules:
+        - type: "exclude_at_match"
+          name: "exclude_healthchecks"
+          pattern: "GET /health"
+        
+        - type: "mask_sequences"
+          name: "mask_api_keys"
+          pattern: "(api_key|password|token)=[^\\s]+"
+          replace_placeholder: "api_key=[REDACTED]"
+        
+        - type: "multi_line"
+          name: "stack_traces"
+          pattern: "^\\s"
+          match_for: "stack_trace"
+    
+    # =============================================================================
+    # PROCESS MONITORING
+    # =============================================================================
+    process_config:
+      enabled: "true"
+      scrub_args: true
+      custom_sensitive_words:
+        - "api_key"
+        - "password" 
+        - "token"
+        - "secret"
+    
+    # =============================================================================
+    # NETWORK MONITORING
+    # =============================================================================
+    network_config:
+      enabled: true
+    
+    # =============================================================================
+    # INTEGRATIONS
+    # =============================================================================
+    
+    # PostgreSQL Integration
+    instances:
+      - host: "${POSTGRES_HOST}"
+        port: 5432
+        username: "${POSTGRES_MONITOR_USER}"
+        password: "${POSTGRES_MONITOR_PASSWORD}"
+        dbname: "postgres"
+        ssl: "require"
+        tags:
+          - "role:primary"
+          - "service:church-database"
+        custom_queries:
+          - metric_prefix: "church.db"
+            query: "SELECT tenant_id, COUNT(*) as active_sessions FROM active_sessions GROUP BY tenant_id"
+            columns:
+              - name: "tenant_id"
+                type: "tag"
+              - name: "active_sessions"
+                type: "gauge"
+          
+          - metric_prefix: "church.db"
+            query: "SELECT COUNT(*) as total_churches FROM churches WHERE status = 'active'"
+            columns:
+              - name: "total_churches"
+                type: "gauge"
+                
+          - metric_prefix: "church.db"
+            query: "SELECT COUNT(*) as prayer_requests_today FROM prayer_requests WHERE created_at >= CURRENT_DATE"
+            columns:
+              - name: "prayer_requests_today"
+                type: "gauge"
+    
+    # Redis Integration
+    redis:
+      host: "${REDIS_HOST}"
+      port: 6379
+      password: "${REDIS_PASSWORD}"
+      tags:
+        - "role:cache"
+        - "service:church-cache"
+      command_stats: true
+      
+    # NGINX Integration
+    nginx:
+      nginx_status_url: "http://nginx:8080/nginx_status"
+      tags:
+        - "service:ingress"
+        
+    # Custom Check Configuration
+    confd_configs:
+      - check_names: ["http_check"]
+        init_configs: [{}]
+        instances:
+          - name: "Church API Health"
+            url: "https://api.visionarychurch.ai/health"
+            timeout: 10
+            method: "GET"
+            tags:
+              - "service:church-api"
+              - "check:health"
+            
+          - name: "Chat Widget Health"
+            url: "https://api.visionarychurch.ai/chat/health"
+            timeout: 5
+            method: "GET"
+            tags:
+              - "service:chat-widget"
+              - "check:health"
+              
+          - name: "Prayer System Health"
+            url: "https://api.visionarychurch.ai/prayers/health"
+            timeout: 5
+            method: "GET"
+            tags:
+              - "service:prayer-system"
+              - "check:health"
+    
+    # =============================================================================
+    # SYNTHETIC MONITORING
+    # =============================================================================
+    synthetics_config:
+      enabled: true
+      global_tags:
+        - "env:${DD_ENV}"
+        - "service:visionary-church-ai"
+
+---
+# Datadog Agent DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: datadog-agent
+  namespace: visionary-church
+  labels:
+    app: datadog-agent
+spec:
+  selector:
+    matchLabels:
+      app: datadog-agent
+  template:
+    metadata:
+      labels:
+        app: datadog-agent
+      annotations:
+        ad.datadoghq.com/agent.checks: |
+          {
+            "openmetrics": {
+              "init_config": {},
+              "instances": [
+                {
+                  "prometheus_url": "http://%%host%%:3000/metrics",
+                  "namespace": "church_app",
+                  "metrics": ["*"]
+                }
+              ]
+            }
+          }
+    spec:
+      serviceAccountName: datadog-agent
+      containers:
+      - name: datadog-agent
+        image: gcr.io/datadoghq/agent:7.48.0
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"
+        ports:
+        - containerPort: 8125
+          name: dogstatsdport
+          protocol: UDP
+        - containerPort: 8126
+          name: traceport
+          protocol: TCP
+        env:
+        - name: DD_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: datadog-secret
+              key: api-key
+        - name: DD_SITE
+          value: "datadoghq.com"
+        - name: DD_ENV
+          value: "production"
+        - name: DD_VERSION
+          value: "1.0.0"
+        - name: DD_LOGS_ENABLED
+          value: "true"
+        - name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
+          value: "true"
+        - name: DD_PROCESS_AGENT_ENABLED
+          value: "true"
+        - name: DD_APM_ENABLED
+          value: "true"
+        - name: DD_APM_NON_LOCAL_TRAFFIC
+          value: "true"
+        - name: KUBERNETES
+          value: "true"
+        - name: DD_KUBERNETES_KUBELET_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DD_CLUSTER_NAME
+          value: "visionary-church-production"
+        - name: DD_COLLECT_KUBERNETES_EVENTS
+          value: "true"
+        - name: DD_LEADER_ELECTION
+          value: "true"
+        - name: DD_ORCHESTRATOR_EXPLORER_ENABLED
+          value: "true"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/datadog-agent/datadog.yaml
+          subPath: datadog.yaml
+        - name: dockersocket
+          mountPath: /var/run/docker.sock
+        - name: procdir
+          mountPath: /host/proc
+          readOnly: true
+        - name: cgroups
+          mountPath: /host/sys/fs/cgroup
+          readOnly: true
+        - name: s6-run
+          mountPath: /var/run/s6
+        - name: logpodpath
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: logcontainerpath
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: pointdir
+          mountPath: /opt/datadog-agent/run
+        livenessProbe:
+          exec:
+            command:
+            - ./probe.sh
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: config-volume
+        configMap:
+          name: datadog-config
+      - name: dockersocket
+        hostPath:
+          path: /var/run/docker.sock
+      - name: procdir
+        hostPath:
+          path: /proc
+      - name: cgroups
+        hostPath:
+          path: /sys/fs/cgroup
+      - name: s6-run
+        emptyDir: {}
+      - name: logpodpath
+        hostPath:
+          path: /var/log/pods
+      - name: logcontainerpath
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: pointdir
+        hostPath:
+          path: /opt/datadog-agent/run
+          type: DirectoryOrCreate
+      tolerations:
+      - operator: Exists
+      nodeSelector:
+        kubernetes.io/os: linux
+
+---
+# Cluster Agent for advanced Kubernetes monitoring
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datadog-cluster-agent
+  namespace: visionary-church
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: datadog-cluster-agent
+  template:
+    metadata:
+      labels:
+        app: datadog-cluster-agent
+    spec:
+      serviceAccountName: datadog-cluster-agent
+      containers:
+      - name: cluster-agent
+        image: gcr.io/datadoghq/cluster-agent:7.48.0
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "100m"
+          limits:
+            memory: "400Mi"
+            cpu: "200m"
+        ports:
+        - containerPort: 5005
+          name: agentport
+          protocol: TCP
+        env:
+        - name: DD_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: datadog-secret
+              key: api-key
+        - name: DD_CLUSTER_AGENT_ENABLED
+          value: "true"
+        - name: DD_CLUSTER_NAME
+          value: "visionary-church-production"
+        - name: DD_CLUSTER_CHECKS_ENABLED
+          value: "true"
+        - name: DD_EXTRA_CONFIG_PROVIDERS
+          value: "kube_endpoints kube_services"
+        - name: DD_EXTRA_LISTENERS
+          value: "kube_endpoints kube_services"
+        - name: DD_LOG_LEVEL
+          value: "INFO"
+        - name: DD_LEADER_ELECTION
+          value: "true"
+        - name: DD_COLLECT_KUBERNETES_EVENTS
+          value: "true"
+        - name: DD_CLUSTER_AGENT_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: datadog-secret
+              key: token
+        livenessProbe:
+          httpGet:
+            path: /live
+            port: 5005
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 5005
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5

@@ -1,0 +1,395 @@
+/**
+ * VisionaryChurch.ai Brand Design Tokens
+ * 
+ * This file contains all brand design tokens as CSS custom properties.
+ * Import this file to access consistent brand values across your application.
+ * 
+ * Usage:
+ * @import './styles/brand-tokens.css';
+ * 
+ * Then use: var(--brand-primary-500) or var(--font-display)
+ */
+
+:root {
+  /* ==========================================
+     BRAND COLORS
+     ========================================== */
+  
+  /* Primary Brand - Celestial Blue */
+  --brand-primary-50: #EFF6FF;
+  --brand-primary-100: #DBEAFE;
+  --brand-primary-200: #BFDBFE;
+  --brand-primary-300: #93C5FD;
+  --brand-primary-400: #60A5FA;
+  --brand-primary-500: #3B82F6;  /* Main brand color */
+  --brand-primary-600: #2563EB;
+  --brand-primary-700: #1D4ED8;
+  --brand-primary-800: #1E40AF;
+  --brand-primary-900: #1E3A8A;
+  --brand-primary-950: #172554;
+
+  /* Secondary Brand - Sacred Purple */
+  --brand-secondary-50: #FAF5FF;
+  --brand-secondary-100: #F3E8FF;
+  --brand-secondary-200: #E9D5FF;
+  --brand-secondary-300: #D8B4FE;
+  --brand-secondary-400: #C084FC;
+  --brand-secondary-500: #A855F7;
+  --brand-secondary-600: #9333EA; /* Main secondary color */
+  --brand-secondary-700: #7C3AED;
+  --brand-secondary-800: #6B21A8;
+  --brand-secondary-900: #581C87;
+  --brand-secondary-950: #3B0764;
+
+  /* Accent - Divine Gold */
+  --brand-accent-50: #FFFBEB;
+  --brand-accent-100: #FEF3C7;
+  --brand-accent-200: #FDE68A;
+  --brand-accent-300: #FCD34D;
+  --brand-accent-400: #FBBF24;
+  --brand-accent-500: #F59E0B; /* Main accent color */
+  --brand-accent-600: #D97706;
+  --brand-accent-700: #B45309;
+  --brand-accent-800: #92400E;
+  --brand-accent-900: #78350F;
+  --brand-accent-950: #451A03;
+
+  /* Supporting - Peaceful Teal */
+  --brand-supporting-50: #F0FDFA;
+  --brand-supporting-100: #CCFBF1;
+  --brand-supporting-200: #99F6E4;
+  --brand-supporting-300: #5EEAD4;
+  --brand-supporting-400: #2DD4BF;
+  --brand-supporting-500: #14B8A6; /* Main supporting color */
+  --brand-supporting-600: #0D9488;
+  --brand-supporting-700: #0F766E;
+  --brand-supporting-800: #115E59;
+  --brand-supporting-900: #134E4A;
+  --brand-supporting-950: #042F2E;
+
+  /* Semantic Colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  /* Church Context Colors */
+  --church-worship: var(--brand-secondary-600);    /* Sacred Purple */
+  --church-community: var(--brand-supporting-600); /* Peaceful Teal */
+  --church-growth: var(--brand-accent-600);        /* Divine Gold */
+  --church-welcome: var(--brand-primary-600);      /* Celestial Blue */
+
+  /* ==========================================
+     TYPOGRAPHY
+     ========================================== */
+  
+  /* Font Families */
+  --font-brand: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  --font-serif: 'Crimson Text', 'Georgia', 'Times New Roman', serif;
+
+  /* Font Weights */
+  --font-weight-thin: 100;
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 900;
+
+  /* Font Sizes */
+  --font-size-xs: 0.75rem;      /* 12px */
+  --font-size-sm: 0.875rem;     /* 14px */
+  --font-size-base: 1rem;       /* 16px */
+  --font-size-lg: 1.125rem;     /* 18px */
+  --font-size-xl: 1.25rem;      /* 20px */
+  --font-size-2xl: 1.5rem;      /* 24px */
+  --font-size-3xl: 1.875rem;    /* 30px */
+  --font-size-4xl: 2.25rem;     /* 36px */
+  --font-size-5xl: 3rem;        /* 48px */
+  --font-size-6xl: 3.75rem;     /* 60px */
+  --font-size-7xl: 4.5rem;      /* 72px */
+  --font-size-8xl: 6rem;        /* 96px */
+  --font-size-9xl: 8rem;        /* 128px */
+
+  /* Line Heights */
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 2;
+
+  /* Letter Spacing */
+  --letter-spacing-tighter: -0.05em;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0em;
+  --letter-spacing-wide: 0.025em;
+  --letter-spacing-wider: 0.05em;
+  --letter-spacing-widest: 0.1em;
+
+  /* ==========================================
+     SPACING & LAYOUT
+     ========================================== */
+  
+  /* Base Spacing Unit */
+  --spacing-unit: 4px;
+
+  /* Spacing Scale (based on 4px unit) */
+  --space-0: 0px;
+  --space-1: 4px;     /* 0.25rem */
+  --space-2: 8px;     /* 0.5rem */
+  --space-3: 12px;    /* 0.75rem */
+  --space-4: 16px;    /* 1rem */
+  --space-5: 20px;    /* 1.25rem */
+  --space-6: 24px;    /* 1.5rem */
+  --space-8: 32px;    /* 2rem */
+  --space-10: 40px;   /* 2.5rem */
+  --space-12: 48px;   /* 3rem */
+  --space-16: 64px;   /* 4rem */
+  --space-20: 80px;   /* 5rem */
+  --space-24: 96px;   /* 6rem */
+  --space-32: 128px;  /* 8rem */
+  --space-40: 160px;  /* 10rem */
+  --space-48: 192px;  /* 12rem */
+  --space-56: 224px;  /* 14rem */
+  --space-64: 256px;  /* 16rem */
+
+  /* Container Sizes */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1536px;
+  --container-brand: 1200px;
+
+  /* ==========================================
+     BORDERS & RADIUS
+     ========================================== */
+  
+  /* Border Radius */
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-full: 9999px;
+
+  /* Brand-specific Radius */
+  --radius-button: var(--radius-md);
+  --radius-card: var(--radius-xl);
+  --radius-modal: var(--radius-2xl);
+
+  /* Border Widths */
+  --border-width-0: 0px;
+  --border-width-1: 1px;
+  --border-width-2: 2px;
+  --border-width-4: 4px;
+  --border-width-8: 8px;
+
+  /* ==========================================
+     SHADOWS & ELEVATION
+     ========================================== */
+  
+  /* Base Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+
+  /* Brand Shadows */
+  --shadow-brand: 0 4px 14px 0 rgba(59, 130, 246, 0.15);
+  --shadow-brand-lg: 0 10px 25px -3px rgba(59, 130, 246, 0.1), 0 4px 6px -2px rgba(59, 130, 246, 0.05);
+  --shadow-church: 0 4px 14px 0 rgba(147, 51, 234, 0.15);
+  
+  /* Glow Effects */
+  --shadow-glow-sm: 0 0 10px rgba(59, 130, 246, 0.3);
+  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.4);
+  --shadow-glow-lg: 0 0 30px rgba(59, 130, 246, 0.5);
+  --shadow-glow-purple: 0 0 20px rgba(147, 51, 234, 0.4);
+  --shadow-glow-gold: 0 0 20px rgba(245, 158, 11, 0.4);
+  --shadow-glow-teal: 0 0 20px rgba(20, 184, 166, 0.4);
+
+  /* ==========================================
+     ANIMATIONS & TRANSITIONS
+     ========================================== */
+  
+  /* Transition Durations */
+  --duration-75: 75ms;
+  --duration-100: 100ms;
+  --duration-150: 150ms;
+  --duration-200: 200ms;
+  --duration-300: 300ms;
+  --duration-500: 500ms;
+  --duration-700: 700ms;
+  --duration-1000: 1000ms;
+
+  /* Transition Timing Functions */
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-brand: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Brand Transitions */
+  --transition-all: all var(--duration-200) var(--ease-brand);
+  --transition-colors: background-color var(--duration-200) var(--ease-brand), 
+                      border-color var(--duration-200) var(--ease-brand),
+                      color var(--duration-200) var(--ease-brand);
+  --transition-transform: transform var(--duration-200) var(--ease-brand);
+  --transition-opacity: opacity var(--duration-200) var(--ease-brand);
+
+  /* ==========================================
+     Z-INDEX SCALE
+     ========================================== */
+  
+  --z-0: 0;
+  --z-10: 10;
+  --z-20: 20;
+  --z-30: 30;
+  --z-40: 40;
+  --z-50: 50;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+
+  /* ==========================================
+     COMPONENT TOKENS
+     ========================================== */
+  
+  /* Buttons */
+  --btn-padding-x-sm: var(--space-3);
+  --btn-padding-y-sm: var(--space-1);
+  --btn-padding-x-md: var(--space-4);
+  --btn-padding-y-md: var(--space-2);
+  --btn-padding-x-lg: var(--space-6);
+  --btn-padding-y-lg: var(--space-3);
+  --btn-font-size-sm: var(--font-size-sm);
+  --btn-font-size-md: var(--font-size-sm);
+  --btn-font-size-lg: var(--font-size-base);
+
+  /* Cards */
+  --card-padding: var(--space-6);
+  --card-radius: var(--radius-card);
+  --card-shadow: var(--shadow-md);
+  --card-border: var(--border-width-1) solid #E5E7EB;
+
+  /* Forms */
+  --input-padding-x: var(--space-3);
+  --input-padding-y: var(--space-2);
+  --input-border-radius: var(--radius-lg);
+  --input-border: var(--border-width-1) solid #D1D5DB;
+  --input-focus-border: var(--border-width-1) solid var(--brand-primary-500);
+  --input-focus-ring: 0 0 0 1px var(--brand-primary-500);
+
+  /* ==========================================
+     BREAKPOINTS
+     ========================================== */
+  
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* ==========================================
+   BRAND GRADIENTS
+   ========================================== */
+
+.gradient-brand {
+  background: linear-gradient(135deg, var(--brand-primary-500) 0%, var(--brand-primary-600) 100%);
+}
+
+.gradient-brand-reverse {
+  background: linear-gradient(135deg, var(--brand-primary-600) 0%, var(--brand-primary-500) 100%);
+}
+
+.gradient-church {
+  background: linear-gradient(135deg, var(--brand-secondary-500) 0%, var(--brand-primary-500) 50%, var(--brand-supporting-500) 100%);
+}
+
+.gradient-worship {
+  background: linear-gradient(135deg, var(--brand-secondary-500) 0%, var(--brand-secondary-600) 100%);
+}
+
+.gradient-community {
+  background: linear-gradient(135deg, var(--brand-supporting-500) 0%, var(--brand-supporting-600) 100%);
+}
+
+.gradient-growth {
+  background: linear-gradient(135deg, var(--brand-accent-500) 0%, var(--brand-accent-600) 100%);
+}
+
+.gradient-text-brand {
+  background: linear-gradient(135deg, var(--brand-primary-500) 0%, var(--brand-secondary-500) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+
+.brand-transition {
+  transition: var(--transition-all);
+}
+
+.brand-focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.brand-focus:focus {
+  outline: 2px solid var(--brand-primary-500);
+  outline-offset: 2px;
+}
+
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================
+   DARK MODE SUPPORT
+   ========================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Adjust colors for dark mode if needed */
+    /* This can be expanded based on dark mode requirements */
+  }
+}
+
+/* ==========================================
+   PRINT STYLES
+   ========================================== */
+
+@media print {
+  :root {
+    /* Optimize colors for print */
+    --brand-primary-500: #2563EB;
+    --brand-secondary-500: #7C3AED;
+    --brand-accent-500: #D97706;
+    --brand-supporting-500: #0D9488;
+  }
+}

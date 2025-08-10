@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: church-config
+  namespace: visionary-church
+data:
+  NODE_ENV: "production"
+  AWS_REGION: "us-east-1"
+  LOG_LEVEL: "info"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  MAX_FILE_SIZE: "10485760"
+  ALLOWED_FILE_TYPES: "image/jpeg,image/png,image/gif,application/pdf,text/csv"
+  DEFAULT_TENANT_SCHEMA: "tenant_default"
+  MAX_TENANTS_PER_INSTANCE: "1000"
+  QUEUE_CONCURRENCY: "10"
+  QUEUE_MAX_ATTEMPTS: "3"
+  CACHE_TTL_SECONDS: "3600"
+  CACHE_MAX_KEYS: "10000"
+  BCRYPT_ROUNDS: "12"
+  ENABLE_AI_CHAT: "true"
+  ENABLE_PAYMENT_PROCESSING: "true"
+  ENABLE_SMS_NOTIFICATIONS: "true"
+  ENABLE_EMAIL_CAMPAIGNS: "true"
+  ENABLE_ANALYTICS: "true"
+  DB_POOL_MIN: "5"
+  DB_POOL_MAX: "50"
+  REDIS_POOL_MIN: "2"
+  REDIS_POOL_MAX: "20"
+  HEALTH_CHECK_TIMEOUT: "5000"
+  HEALTH_CHECK_INTERVAL: "30000"
+  HEALTH_CHECK_RETRIES: "3"
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9090"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: church-config-staging
+  namespace: visionary-church-staging
+data:
+  NODE_ENV: "staging"
+  AWS_REGION: "us-east-1"
+  LOG_LEVEL: "debug"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX_REQUESTS: "200"
+  MAX_FILE_SIZE: "10485760"
+  ALLOWED_FILE_TYPES: "image/jpeg,image/png,image/gif,application/pdf,text/csv"
+  DEFAULT_TENANT_SCHEMA: "tenant_default"
+  MAX_TENANTS_PER_INSTANCE: "100"
+  QUEUE_CONCURRENCY: "5"
+  QUEUE_MAX_ATTEMPTS: "3"
+  CACHE_TTL_SECONDS: "1800"
+  CACHE_MAX_KEYS: "5000"
+  BCRYPT_ROUNDS: "10"
+  ENABLE_AI_CHAT: "true"
+  ENABLE_PAYMENT_PROCESSING: "false"
+  ENABLE_SMS_NOTIFICATIONS: "true"
+  ENABLE_EMAIL_CAMPAIGNS: "true"
+  ENABLE_ANALYTICS: "true"
+  DB_POOL_MIN: "2"
+  DB_POOL_MAX: "20"
+  REDIS_POOL_MIN: "1"
+  REDIS_POOL_MAX: "10"
+  HEALTH_CHECK_TIMEOUT: "3000"
+  HEALTH_CHECK_INTERVAL: "15000"
+  HEALTH_CHECK_RETRIES: "5"
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9090"

@@ -1,0 +1,278 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: church-api
+  namespace: visionary-church
+  labels:
+    app: church-api
+    version: v1
+    environment: production
+spec:
+  replicas: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: church-api
+  template:
+    metadata:
+      labels:
+        app: church-api
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: church-api-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: api
+        image: ghcr.io/your-org/visionary-church-ai:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: church-config
+        - secretRef:
+            name: church-secrets
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+            ephemeral-storage: 500Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 6
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: tmp
+          mountPath: /tmp
+        - name: uploads
+          mountPath: /app/uploads
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: logs
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 500Mi
+      - name: uploads
+        emptyDir:
+          sizeLimit: 2Gi
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "amd64"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - church-api
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values:
+                - m5.large
+                - m5.xlarge
+                - c5.large
+                - c5.xlarge
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: church-worker
+  namespace: visionary-church
+  labels:
+    app: church-worker
+    version: v1
+    environment: production
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: church-worker
+  template:
+    metadata:
+      labels:
+        app: church-worker
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: church-api-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: worker
+        image: ghcr.io/your-org/visionary-church-ai:latest
+        imagePullPolicy: Always
+        command: ["node", "dist/worker.js"]
+        ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: church-config
+        - secretRef:
+            name: church-secrets
+        env:
+        - name: WORKER_TYPE
+          value: "background-jobs"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+            ephemeral-storage: 500Mi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+            ephemeral-storage: 250Mi
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep '[n]ode dist/worker.js' | wc -l | grep -q '^1$'"
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep '[n]ode dist/worker.js' | wc -l | grep -q '^1$'"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: logs
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 500Mi
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - church-worker
+              topologyKey: kubernetes.io/hostname

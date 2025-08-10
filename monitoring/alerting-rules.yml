@@ -1,0 +1,625 @@
+# Alerting Rules for VisionaryChurch-AI
+# Production-ready alert rules for multi-tenant SaaS monitoring
+
+groups:
+  # =============================================================================
+  # APPLICATION HEALTH ALERTS
+  # =============================================================================
+  - name: application.health
+    interval: 30s
+    rules:
+      - alert: APIDown
+        expr: up{job="church-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: api
+          team: platform
+        annotations:
+          summary: "Church API is down"
+          description: "Church API has been down for more than 2 minutes on {{ $labels.instance }}"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{job="church-api",code=~"5.."}[5m]) / rate(http_requests_total{job="church-api"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+          team: platform
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="church-api"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+          team: platform
+        annotations:
+          summary: "High latency detected"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.instance }}"
+
+      - alert: HealthCheckFailure
+        expr: church_health_check_success == 0
+        for: 3m
+        labels:
+          severity: critical
+          service: api
+          team: platform
+        annotations:
+          summary: "Health check failing"
+          description: "Health check has been failing for {{ $labels.instance }} for 3 minutes"
+
+  # =============================================================================
+  # RESOURCE UTILIZATION ALERTS
+  # =============================================================================
+  - name: resource.utilization
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{pod=~"church-api-.*"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: api
+          team: platform
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% for pod {{ $labels.pod }}"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{pod=~"church-api-.*"} / container_spec_memory_limit_bytes * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: api
+          team: platform
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}% for pod {{ $labels.pod }}"
+
+      - alert: PodRestartLoop
+        expr: increase(kube_pod_container_status_restarts_total[1h]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+          team: platform
+        annotations:
+          summary: "Pod restarting frequently"
+          description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
+
+  # =============================================================================
+  # DATABASE ALERTS
+  # =============================================================================
+  - name: database.health
+    interval: 30s
+    rules:
+      - alert: DatabaseDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+          team: platform
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL database has been down for more than 2 minutes"
+
+      - alert: HighDatabaseConnections
+        expr: pg_stat_activity_count{state="active"} / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+          team: platform
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value | humanizePercentage }}"
+
+      - alert: SlowQueries
+        expr: rate(pg_stat_activity_count{state="active"}[5m]) > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+          team: platform
+        annotations:
+          summary: "High number of slow queries"
+          description: "There are {{ $value }} slow queries per second"
+
+      - alert: DatabaseDeadlocks
+        expr: increase(pg_stat_database_deadlocks[5m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+          service: database
+          team: platform
+        annotations:
+          summary: "Database deadlocks detected"
+          description: "{{ $value }} deadlocks detected in the last 5 minutes"
+
+  # =============================================================================
+  # CACHE ALERTS
+  # =============================================================================
+  - name: cache.health
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: cache
+          team: platform
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis has been down for more than 2 minutes"
+
+      - alert: HighRedisMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+          service: cache
+          team: platform
+        annotations:
+          summary: "High Redis memory usage"
+          description: "Redis memory usage is {{ $value }}%"
+
+      - alert: RedisSlowLog
+        expr: increase(redis_slowlog_length[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+          team: platform
+        annotations:
+          summary: "Redis slow queries detected"
+          description: "{{ $value }} slow queries detected in Redis"
+
+  # =============================================================================
+  # QUEUE ALERTS
+  # =============================================================================
+  - name: queue.health
+    interval: 30s
+    rules:
+      - alert: HighQueueLength
+        expr: church_queue_length > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: queue
+          team: platform
+        annotations:
+          summary: "High queue length"
+          description: "Queue {{ $labels.queue_name }} has {{ $value }} items"
+
+      - alert: QueueProcessingDelay
+        expr: church_queue_processing_delay_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          service: queue
+          team: platform
+        annotations:
+          summary: "Queue processing delay"
+          description: "Queue {{ $labels.queue_name }} processing delay is {{ $value }}s"
+
+      - alert: FailedJobs
+        expr: increase(church_queue_failed_jobs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: queue
+          team: platform
+        annotations:
+          summary: "High number of failed jobs"
+          description: "{{ $value }} jobs failed in the last 5 minutes for queue {{ $labels.queue_name }}"
+
+  # =============================================================================
+  # BUSINESS METRICS ALERTS
+  # =============================================================================
+  - name: business.metrics
+    interval: 60s
+    rules:
+      - alert: LowUserActivity
+        expr: rate(church_user_logins_total[1h]) < 10
+        for: 30m
+        labels:
+          severity: warning
+          service: business
+          team: product
+        annotations:
+          summary: "Low user activity detected"
+          description: "User login rate has been {{ $value }} logins/hour for 30 minutes"
+
+      - alert: HighTenantChurn
+        expr: increase(church_tenants_churned_total[1d]) > 5
+        for: 0m
+        labels:
+          severity: warning
+          service: business
+          team: product
+        annotations:
+          summary: "High tenant churn rate"
+          description: "{{ $value }} tenants churned today"
+
+      - alert: PaymentFailures
+        expr: increase(church_payment_failures_total[1h]) > 10
+        for: 15m
+        labels:
+          severity: warning
+          service: payments
+          team: platform
+        annotations:
+          summary: "High payment failure rate"
+          description: "{{ $value }} payment failures in the last hour"
+
+  # =============================================================================
+  # SECURITY ALERTS
+  # =============================================================================
+  - name: security.alerts
+    interval: 30s
+    rules:
+      - alert: SuspiciousLoginAttempts
+        expr: rate(church_failed_login_attempts_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+          team: platform
+        annotations:
+          summary: "Suspicious login attempts"
+          description: "{{ $value }} failed login attempts per second from {{ $labels.source_ip }}"
+
+      - alert: DDoSAttack
+        expr: rate(nginx_ingress_controller_requests[1m]) > 1000
+        for: 2m
+        labels:
+          severity: critical
+          service: security
+          team: platform
+        annotations:
+          summary: "Potential DDoS attack"
+          description: "Request rate is {{ $value }} requests/second"
+
+      - alert: AbnormallyHighTraffic
+        expr: rate(http_requests_total{job="church-api"}[5m]) > 500
+        for: 10m
+        labels:
+          severity: warning
+          service: security
+          team: platform
+        annotations:
+          summary: "Abnormally high traffic"
+          description: "Request rate is {{ $value }} requests/second for {{ $labels.instance }}"
+
+      - alert: UnauthorizedAPIAccess
+        expr: rate(church_api_unauthorized_requests_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+          team: platform
+        annotations:
+          summary: "High rate of unauthorized API requests"
+          description: "{{ $value }} unauthorized requests per second detected"
+
+      - alert: PasswordBruteForceAttempt
+        expr: rate(church_password_failures_total{source_ip=~".+"}[5m]) > 20
+        for: 1m
+        labels:
+          severity: critical
+          service: security
+          team: platform
+        annotations:
+          summary: "Password brute force attack detected"
+          description: "{{ $value }} password failures per second from IP {{ $labels.source_ip }}"
+
+      - alert: SQLInjectionAttempt
+        expr: increase(church_sql_injection_attempts_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: security
+          team: platform
+        annotations:
+          summary: "SQL injection attempt detected"
+          description: "{{ $value }} SQL injection attempts detected in the last 5 minutes"
+
+  # =============================================================================
+  # INFRASTRUCTURE ALERTS
+  # =============================================================================
+  - name: infrastructure.alerts
+    interval: 60s
+    rules:
+      - alert: KubernetesNodeDown
+        expr: up{job="kubernetes-nodes"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "Kubernetes node is down"
+          description: "Node {{ $labels.instance }} has been down for more than 5 minutes"
+
+      - alert: KubernetesNodeMemoryPressure
+        expr: kube_node_status_condition{condition="MemoryPressure", status="true"} == 1
+        for: 10m
+        labels:
+          severity: warning
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "Node memory pressure"
+          description: "Node {{ $labels.node }} is experiencing memory pressure"
+
+      - alert: CertificateExpiring
+        expr: (x509_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "Certificate for {{ $labels.instance }} expires in {{ $value }} days"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 10m
+        labels:
+          severity: critical
+          service: infrastructure
+          team: platform
+        annotations:
+          summary: "Disk space running low"
+          description: "Only {{ $value }}% disk space remaining on {{ $labels.instance }}"
+
+  # =============================================================================
+  # ENHANCED BUSINESS METRICS ALERTS
+  # =============================================================================
+  - name: enhanced.business.metrics
+    interval: 30s
+    rules:
+      - alert: ChatWidgetConversationDrop
+        expr: rate(church_chat_conversations_started_total[1h]) < rate(church_chat_conversations_started_total[6h] offset 1h) * 0.5
+        for: 30m
+        labels:
+          severity: warning
+          service: chat-widget
+          team: product
+        annotations:
+          summary: "Significant drop in chat widget conversations"
+          description: "Chat conversation start rate has dropped by >50% in the last hour compared to 6h average"
+
+      - alert: PrayerRequestBacklog
+        expr: church_prayer_requests_pending_count > 100
+        for: 15m
+        labels:
+          severity: warning
+          service: prayer-system
+          team: pastoral
+        annotations:
+          summary: "High number of pending prayer requests"
+          description: "{{ $value }} prayer requests are pending assignment to pastoral staff"
+
+      - alert: VisitPlanningLowConversion
+        expr: (rate(church_visit_confirmations_total[1d]) / rate(church_visit_requests_total[1d])) < 0.3
+        for: 2h
+        labels:
+          severity: warning
+          service: visit-planning
+          team: pastoral
+        annotations:
+          summary: "Low visit confirmation rate"
+          description: "Visit confirmation rate is {{ $value | humanizePercentage }}, below 30% threshold"
+
+      - alert: EventRegistrationFailures
+        expr: increase(church_event_registration_failures_total[1h]) > 20
+        for: 15m
+        labels:
+          severity: warning
+          service: event-management
+          team: platform
+        annotations:
+          summary: "High event registration failure rate"
+          description: "{{ $value }} event registration failures in the last hour"
+
+      - alert: FollowUpSequenceStalled
+        expr: church_follow_up_sequences_stalled_count > 50
+        for: 30m
+        labels:
+          severity: warning
+          service: follow-up-sequences
+          team: platform
+        annotations:
+          summary: "Follow-up sequences are stalled"
+          description: "{{ $value }} follow-up sequences have been stalled for over 1 hour"
+
+      - alert: MultiTenantResourceImbalance
+        expr: max(church_tenant_resource_usage_percent) / min(church_tenant_resource_usage_percent) > 10
+        for: 1h
+        labels:
+          severity: warning
+          service: multi-tenant
+          team: platform
+        annotations:
+          summary: "Significant resource usage imbalance between tenants"
+          description: "Resource usage varies by {{ $value }}x between heaviest and lightest tenant usage"
+
+      - alert: OpenAIAPIQuotaExceeded
+        expr: church_openai_quota_usage_percent > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: ai-chat
+          team: platform
+        annotations:
+          summary: "OpenAI API quota nearly exceeded"
+          description: "OpenAI API usage is at {{ $value }}% of monthly quota"
+
+      - alert: EmailDeliveryRateDecline
+        expr: (rate(church_emails_delivered_total[1h]) / rate(church_emails_sent_total[1h])) < 0.95
+        for: 30m
+        labels:
+          severity: warning
+          service: communication
+          team: platform
+        annotations:
+          summary: "Email delivery rate below threshold"
+          description: "Email delivery rate is {{ $value | humanizePercentage }}, below 95% threshold"
+
+      - alert: SMSDeliveryFailures
+        expr: increase(church_sms_delivery_failures_total[1h]) > 10
+        for: 15m
+        labels:
+          severity: warning
+          service: communication
+          team: platform
+        annotations:
+          summary: "High SMS delivery failure rate"
+          description: "{{ $value }} SMS delivery failures in the last hour"
+
+  # =============================================================================
+  # USER EXPERIENCE ALERTS
+  # =============================================================================
+  - name: user.experience
+    interval: 30s
+    rules:
+      - alert: PageLoadTimeRegression
+        expr: histogram_quantile(0.95, rate(church_page_load_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: frontend
+          team: platform
+        annotations:
+          summary: "Page load time regression detected"
+          description: "95th percentile page load time is {{ $value }}s, above 5s threshold"
+
+      - alert: ChatWidgetResponseDelay
+        expr: histogram_quantile(0.95, rate(church_chat_response_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: chat-widget
+          team: platform
+        annotations:
+          summary: "Chat widget response delays"
+          description: "95th percentile chat response time is {{ $value }}s, above 30s threshold"
+
+      - alert: MobileAppCrashes
+        expr: increase(church_mobile_crashes_total[1h]) > 5
+        for: 15m
+        labels:
+          severity: critical
+          service: mobile-app
+          team: platform
+        annotations:
+          summary: "High mobile app crash rate"
+          description: "{{ $value }} mobile app crashes reported in the last hour"
+
+      - alert: SearchPerformanceDegradation
+        expr: histogram_quantile(0.95, rate(church_search_query_duration_seconds_bucket[5m])) > 3
+        for: 10m
+        labels:
+          severity: warning
+          service: search
+          team: platform
+        annotations:
+          summary: "Search performance degradation"
+          description: "95th percentile search query time is {{ $value }}s, above 3s threshold"
+
+  # =============================================================================
+  # TENANT-SPECIFIC ALERTS
+  # =============================================================================
+  - name: tenant.specific
+    interval: 60s
+    rules:
+      - alert: TenantDatabaseConnectionLeak
+        expr: church_tenant_db_connections{tenant=~".+"} > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: database
+          team: platform
+        annotations:
+          summary: "Database connection leak for tenant"
+          description: "Tenant {{ $labels.tenant }} is using {{ $value }} database connections"
+
+      - alert: TenantStorageQuotaExceeded
+        expr: church_tenant_storage_usage_percent{tenant=~".+"} > 90
+        for: 15m
+        labels:
+          severity: warning
+          service: storage
+          team: platform
+        annotations:
+          summary: "Tenant storage quota nearly exceeded"
+          description: "Tenant {{ $labels.tenant }} is using {{ $value }}% of storage quota"
+
+      - alert: TenantAPIRateLimitHit
+        expr: increase(church_tenant_rate_limit_exceeded_total{tenant=~".+"}[1h]) > 100
+        for: 15m
+        labels:
+          severity: warning
+          service: api
+          team: platform
+        annotations:
+          summary: "Tenant hitting API rate limits frequently"
+          description: "Tenant {{ $labels.tenant }} exceeded rate limits {{ $value }} times in the last hour"
+
+  # =============================================================================
+  # EXTERNAL DEPENDENCY ALERTS
+  # =============================================================================
+  - name: external.dependencies
+    interval: 30s
+    rules:
+      - alert: OpenAIServiceDown
+        expr: up{job="blackbox", instance="https://api.openai.com/v1/models"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: openai
+          team: platform
+        annotations:
+          summary: "OpenAI API is unreachable"
+          description: "OpenAI API has been unreachable for 5 minutes - chat functionality may be impaired"
+
+      - alert: SendGridServiceDown
+        expr: up{job="blackbox", instance="https://api.sendgrid.com/v3/mail/send"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: sendgrid
+          team: platform
+        annotations:
+          summary: "SendGrid API is unreachable"
+          description: "SendGrid API has been unreachable for 5 minutes - email functionality may be impaired"
+
+      - alert: TwilioServiceDown
+        expr: up{job="blackbox", instance="https://api.twilio.com/2010-04-01/Accounts"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: twilio
+          team: platform
+        annotations:
+          summary: "Twilio API is unreachable"
+          description: "Twilio API has been unreachable for 5 minutes - SMS functionality may be impaired"
+
+      - alert: ExternalServiceHighLatency
+        expr: probe_duration_seconds{job="blackbox"} > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: external
+          team: platform
+        annotations:
+          summary: "High latency to external service"
+          description: "{{ $labels.instance }} is responding slowly ({{ $value }}s response time)"

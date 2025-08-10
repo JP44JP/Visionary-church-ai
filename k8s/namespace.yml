@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: visionary-church
+  labels:
+    name: visionary-church
+    environment: production
+    app: church-management
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: visionary-church-staging
+  labels:
+    name: visionary-church-staging
+    environment: staging
+    app: church-management

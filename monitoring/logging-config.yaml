@@ -1,0 +1,845 @@
+# =============================================================================
+# COMPREHENSIVE LOGGING CONFIGURATION
+# ELK Stack (Elasticsearch, Logstash, Kibana) + Fluent Bit
+# =============================================================================
+
+# Fluent Bit Configuration for Log Collection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: visionary-church
+  labels:
+    app: fluent-bit
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     info
+        Daemon        off
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+        storage.path  /var/log/flb-storage/
+        storage.sync  normal
+        storage.checksum off
+        storage.backlog.mem_limit 5M
+        
+    # Input Sources
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*church-api*.log
+        Multiline         On
+        Parser_Firstline  docker_multiline
+        Tag               kubernetes.church-api
+        Buffer_Max_Size   5MB
+        Buffer_Chunk_Size 1MB
+        storage.type      filesystem
+        
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*chat-widget*.log
+        Parser            docker
+        Tag               kubernetes.chat-widget
+        Buffer_Max_Size   5MB
+        storage.type      filesystem
+        
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*prayer-system*.log
+        Parser            docker
+        Tag               kubernetes.prayer-system
+        Buffer_Max_Size   5MB
+        storage.type      filesystem
+        
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*visit-planning*.log
+        Parser            docker
+        Tag               kubernetes.visit-planning
+        Buffer_Max_Size   5MB
+        storage.type      filesystem
+        
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*event-management*.log
+        Parser            docker
+        Tag               kubernetes.event-management
+        Buffer_Max_Size   5MB
+        storage.type      filesystem
+        
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*follow-up*.log
+        Parser            docker
+        Tag               kubernetes.follow-up
+        Buffer_Max_Size   5MB
+        storage.type      filesystem
+        
+    # Kubernetes API Server Logs
+    [INPUT]
+        Name              systemd
+        Tag               kubernetes.audit
+        Systemd_Filter    _SYSTEMD_UNIT=kube-apiserver.service
+        
+    # PostgreSQL Logs
+    [INPUT]
+        Name              tail
+        Path              /var/log/postgresql/*.log
+        Parser            postgres
+        Tag               database.postgresql
+        Buffer_Max_Size   10MB
+        storage.type      filesystem
+        
+    # Redis Logs
+    [INPUT]
+        Name              tail
+        Path              /var/log/redis/*.log
+        Parser            redis
+        Tag               cache.redis
+        Buffer_Max_Size   5MB
+        storage.type      filesystem
+        
+    # NGINX Access and Error Logs
+    [INPUT]
+        Name              tail
+        Path              /var/log/nginx/access.log
+        Parser            nginx_access
+        Tag               web.nginx.access
+        
+    [INPUT]
+        Name              tail
+        Path              /var/log/nginx/error.log
+        Parser            nginx_error
+        Tag               web.nginx.error
+        
+    # Security Logs
+    [INPUT]
+        Name              tail
+        Path              /var/log/auth.log
+        Parser            auth
+        Tag               security.auth
+        
+    # System Metrics as Logs
+    [INPUT]
+        Name              node_exporter_metrics
+        Tag               metrics.node
+        Scrape_Interval   30
+        
+    # Filters
+    [FILTER]
+        Name              kubernetes
+        Match             kubernetes.*
+        Kube_URL          https://kubernetes.default.svc:443
+        Kube_CA_File      /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File   /var/run/secrets/kubernetes.io/serviceaccount/token
+        Merge_Log         On
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude Off
+        
+    [FILTER]
+        Name              modify
+        Match             kubernetes.*
+        Add               cluster_name visionary-church-production
+        Add               environment production
+        Add               platform kubernetes
+        
+    # Tenant ID Extraction
+    [FILTER]
+        Name              lua
+        Match             kubernetes.church-api
+        Script            tenant_extractor.lua
+        Call              extract_tenant_id
+        
+    # Security Event Detection
+    [FILTER]
+        Name              lua
+        Match             *
+        Script            security_detector.lua
+        Call              detect_security_events
+        
+    # Log Enrichment
+    [FILTER]
+        Name              record_modifier
+        Match             *
+        Record            hostname ${HOSTNAME}
+        Record            timestamp ${strftime:%Y-%m-%dT%H:%M:%S%z}
+        
+    # Performance Log Classification
+    [FILTER]
+        Name              lua
+        Match             kubernetes.*
+        Script            performance_classifier.lua
+        Call              classify_performance_logs
+        
+    # Sensitive Data Masking
+    [FILTER]
+        Name              modify
+        Match             *
+        Remove_regex      password.*
+        Remove_regex      api_key.*
+        Remove_regex      token.*
+        Remove_regex      secret.*
+        
+    [FILTER]
+        Name              lua
+        Match             *
+        Script            data_masker.lua
+        Call              mask_sensitive_data
+        
+    # Error Aggregation
+    [FILTER]
+        Name              lua
+        Match             *
+        Script            error_aggregator.lua
+        Call              aggregate_errors
+        
+    # Business Metrics Extraction
+    [FILTER]
+        Name              lua
+        Match             kubernetes.church-api
+        Script            business_metrics.lua
+        Call              extract_business_metrics
+        
+    # Outputs
+    [OUTPUT]
+        Name              es
+        Match             kubernetes.*
+        Host              elasticsearch.logging.svc.cluster.local
+        Port              9200
+        Index             church-app-logs
+        Type              _doc
+        Logstash_Format   On
+        Logstash_Prefix   church-app
+        Logstash_DateFormat %Y.%m.%d
+        Time_Key          @timestamp
+        Time_Key_Format   %Y-%m-%dT%H:%M:%S.%L%z
+        Include_Tag_Key   On
+        Tag_Key           source
+        Buffer_Size       5MB
+        
+    [OUTPUT]
+        Name              es
+        Match             database.*
+        Host              elasticsearch.logging.svc.cluster.local
+        Port              9200
+        Index             church-db-logs
+        Type              _doc
+        Logstash_Format   On
+        Logstash_Prefix   church-db
+        Buffer_Size       10MB
+        
+    [OUTPUT]
+        Name              es
+        Match             cache.*
+        Host              elasticsearch.logging.svc.cluster.local
+        Port              9200
+        Index             church-cache-logs
+        Type              _doc
+        Logstash_Format   On
+        Logstash_Prefix   church-cache
+        Buffer_Size       5MB
+        
+    [OUTPUT]
+        Name              es
+        Match             web.*
+        Host              elasticsearch.logging.svc.cluster.local
+        Port              9200
+        Index             church-web-logs
+        Type              _doc
+        Logstash_Format   On
+        Logstash_Prefix   church-web
+        Buffer_Size       5MB
+        
+    [OUTPUT]
+        Name              es
+        Match             security.*
+        Host              elasticsearch.logging.svc.cluster.local
+        Port              9200
+        Index             church-security-logs
+        Type              _doc
+        Logstash_Format   On
+        Logstash_Prefix   church-security
+        Buffer_Size       5MB
+        
+    # High-priority alerts to separate index
+    [OUTPUT]
+        Name              es
+        Match_Regex       .*error.*|.*critical.*|.*alert.*
+        Host              elasticsearch.logging.svc.cluster.local
+        Port              9200
+        Index             church-alerts
+        Type              _doc
+        Buffer_Size       1MB
+        
+    # Metrics extraction output
+    [OUTPUT]
+        Name              prometheus_exporter
+        Match             metrics.*
+        Host              0.0.0.0
+        Port              2021
+        
+    # Backup to S3 for compliance
+    [OUTPUT]
+        Name              s3
+        Match             *
+        Bucket            visionary-church-logs-backup
+        Region            us-east-1
+        Total_File_Size   50M
+        Upload_Timeout    10m
+        S3_Key_Format     /year=%Y/month=%m/day=%d/hour=%H/%{hostname}_%{tag[2]}_%{time:yyyyMMdd-HHmmss}_%{uuid}.gz
+        
+  parsers.conf: |
+    [PARSER]
+        Name         docker
+        Format       json
+        Time_Key     time
+        Time_Format  %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep    On
+        
+    [PARSER]
+        Name         docker_multiline
+        Format       regex
+        Regex        ^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z) (?<level>\w+) (?<message>.*)
+        Time_Key     time
+        Time_Format  %Y-%m-%dT%H:%M:%S.%L
+        
+    [PARSER]
+        Name         postgres
+        Format       regex
+        Regex        ^(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{3} \w+) \[(?<pid>\d+)\] (?<level>\w+):  (?<message>.*)
+        Time_Key     time
+        Time_Format  %Y-%m-%d %H:%M:%S.%L
+        
+    [PARSER]
+        Name         redis
+        Format       regex
+        Regex        ^(?<pid>\d+):(?<role>\w) (?<time>\d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2}.\d{3}) (?<level>[\*\#\-\.]) (?<message>.*)
+        Time_Key     time
+        Time_Format  %d %b %Y %H:%M:%S.%L
+        
+    [PARSER]
+        Name         nginx_access
+        Format       regex
+        Regex        ^(?<remote>[^ ]*) (?<host>[^ ]*) (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^\"]*?)(?: +\S*)?)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")?$
+        Time_Key     time
+        Time_Format  %d/%b/%Y:%H:%M:%S %z
+        
+    [PARSER]
+        Name         nginx_error
+        Format       regex
+        Regex        ^(?<time>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?<level>\w+)\] (?<pid>\d+)#(?<tid>\d+): \*(?<cid>\d+) (?<message>.*)
+        Time_Key     time
+        Time_Format  %Y/%m/%d %H:%M:%S
+        
+    [PARSER]
+        Name         auth
+        Format       regex
+        Regex        ^(?<time>\w{3} \d{1,2} \d{2}:\d{2}:\d{2}) (?<host>[^ ]*) (?<process>[^:\[]*)(:\[(?<pid>\d+)\])?: (?<message>.*)
+        Time_Key     time
+        Time_Format  %b %d %H:%M:%S
+        
+  tenant_extractor.lua: |
+    function extract_tenant_id(tag, timestamp, record)
+        -- Extract tenant ID from various sources
+        if record["log"] then
+            local tenant_match = string.match(record["log"], "tenant[_-]id[\"':%s]*([%w-]+)")
+            if tenant_match then
+                record["tenant_id"] = tenant_match
+            end
+        end
+        
+        -- Extract from Kubernetes labels
+        if record["kubernetes"] and record["kubernetes"]["labels"] then
+            local labels = record["kubernetes"]["labels"]
+            if labels["tenant"] then
+                record["tenant_id"] = labels["tenant"]
+            end
+        end
+        
+        -- Extract from request headers (for API logs)
+        if record["log"] then
+            local header_match = string.match(record["log"], "x%-tenant%-id[\"':%s]*([%w-]+)")
+            if header_match then
+                record["tenant_id"] = header_match
+            end
+        end
+        
+        return 1, timestamp, record
+    end
+    
+  security_detector.lua: |
+    function detect_security_events(tag, timestamp, record)
+        local log_message = record["log"] or record["message"] or ""
+        local security_indicators = {
+            "failed login",
+            "unauthorized",
+            "sql injection",
+            "xss attempt",
+            "brute force",
+            "suspicious activity",
+            "security violation",
+            "access denied",
+            "authentication failed"
+        }
+        
+        -- Check for security indicators
+        for _, indicator in ipairs(security_indicators) do
+            if string.find(string.lower(log_message), indicator) then
+                record["security_event"] = true
+                record["security_type"] = indicator
+                record["priority"] = "high"
+                break
+            end
+        end
+        
+        -- Check for high error rates
+        if record["level"] == "ERROR" or record["level"] == "CRITICAL" then
+            record["alert_eligible"] = true
+        end
+        
+        return 1, timestamp, record
+    end
+    
+  performance_classifier.lua: |
+    function classify_performance_logs(tag, timestamp, record)
+        local log_message = record["log"] or record["message"] or ""
+        
+        -- Extract response times
+        local response_time = string.match(log_message, "response_time[\"':%s]*([%d%.]+)")
+        if response_time then
+            record["response_time"] = tonumber(response_time)
+            if tonumber(response_time) > 2000 then
+                record["performance_issue"] = true
+                record["issue_type"] = "slow_response"
+            end
+        end
+        
+        -- Extract database query times
+        local db_time = string.match(log_message, "db_query_time[\"':%s]*([%d%.]+)")
+        if db_time then
+            record["db_query_time"] = tonumber(db_time)
+            if tonumber(db_time) > 1000 then
+                record["performance_issue"] = true
+                record["issue_type"] = "slow_query"
+            end
+        end
+        
+        -- Extract memory usage
+        local memory_usage = string.match(log_message, "memory_usage[\"':%s]*([%d%.]+)")
+        if memory_usage then
+            record["memory_usage_mb"] = tonumber(memory_usage)
+            if tonumber(memory_usage) > 500 then
+                record["performance_issue"] = true
+                record["issue_type"] = "high_memory"
+            end
+        end
+        
+        return 1, timestamp, record
+    end
+    
+  data_masker.lua: |
+    function mask_sensitive_data(tag, timestamp, record)
+        local log_message = record["log"] or record["message"] or ""
+        
+        -- Mask patterns
+        local patterns = {
+            {pattern = "(password[\"':%s]*)([^\"',%s}]+)", replacement = "%1[MASKED]"},
+            {pattern = "(api[_-]key[\"':%s]*)([^\"',%s}]+)", replacement = "%1[MASKED]"},
+            {pattern = "(token[\"':%s]*)([^\"',%s}]+)", replacement = "%1[MASKED]"},
+            {pattern = "(secret[\"':%s]*)([^\"',%s}]+)", replacement = "%1[MASKED]"},
+            {pattern = "(%d{4}[-]?%d{4}[-]?%d{4}[-]?)%d{4}", replacement = "%1XXXX"}, -- Credit cards
+            {pattern = "([%w%.%-]+)@([%w%.%-]+%.%w+)", replacement = "[EMAIL-MASKED]@%2"}, -- Email addresses
+            {pattern = "(%+?%d?[-]?%(?%d{3}%)?)[-]?%d{3}[-]?%d{4}", replacement = "[PHONE-MASKED]"} -- Phone numbers
+        }
+        
+        for _, mask in ipairs(patterns) do
+            log_message = string.gsub(log_message, mask.pattern, mask.replacement)
+        end
+        
+        record["log"] = log_message
+        record["message"] = log_message
+        
+        return 1, timestamp, record
+    end
+    
+  error_aggregator.lua: |
+    function aggregate_errors(tag, timestamp, record)
+        local log_message = record["log"] or record["message"] or ""
+        local level = record["level"] or ""
+        
+        -- Aggregate common error patterns
+        if level == "ERROR" or level == "CRITICAL" or level == "FATAL" then
+            -- Extract error types
+            local error_patterns = {
+                {pattern = "database.*connection.*failed", type = "db_connection_error"},
+                {pattern = "timeout.*exceeded", type = "timeout_error"},
+                {pattern = "out.*of.*memory", type = "memory_error"},
+                {pattern = "rate.*limit.*exceeded", type = "rate_limit_error"},
+                {pattern = "authentication.*failed", type = "auth_error"},
+                {pattern = "payment.*failed", type = "payment_error"},
+                {pattern = "external.*service.*unavailable", type = "external_service_error"}
+            }
+            
+            for _, pattern_info in ipairs(error_patterns) do
+                if string.find(string.lower(log_message), pattern_info.pattern) then
+                    record["error_category"] = pattern_info.type
+                    record["requires_attention"] = true
+                    break
+                end
+            end
+            
+            -- Extract stack traces
+            if string.find(log_message, "at ") and string.find(log_message, "\\n") then
+                record["has_stack_trace"] = true
+            end
+        end
+        
+        return 1, timestamp, record
+    end
+    
+  business_metrics.lua: |
+    function extract_business_metrics(tag, timestamp, record)
+        local log_message = record["log"] or record["message"] or ""
+        
+        -- Extract business events
+        local business_events = {
+            "chat_conversation_started",
+            "prayer_request_submitted",
+            "visit_scheduled",
+            "event_registration_completed",
+            "follow_up_sent",
+            "payment_processed",
+            "user_signed_up",
+            "tenant_created"
+        }
+        
+        for _, event in ipairs(business_events) do
+            if string.find(string.lower(log_message), event) then
+                record["business_event"] = event
+                record["metrics_extraction"] = true
+                
+                -- Extract tenant information
+                local tenant_match = string.match(log_message, "tenant[_-]id[\"':%s]*([%w-]+)")
+                if tenant_match then
+                    record["business_tenant"] = tenant_match
+                end
+                break
+            end
+        end
+        
+        -- Extract monetary values
+        local amount_match = string.match(log_message, "amount[\"':%s]*([%d%.]+)")
+        if amount_match then
+            record["monetary_amount"] = tonumber(amount_match)
+        end
+        
+        return 1, timestamp, record
+    end
+
+---
+# Logstash Configuration for Advanced Log Processing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: visionary-church
+data:
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    pipeline.workers: 4
+    pipeline.output.workers: 2
+    pipeline.batch.size: 1000
+    pipeline.batch.delay: 50
+    
+  pipelines.yml: |
+    - pipeline.id: main
+      path.config: "/usr/share/logstash/pipeline/main.conf"
+      pipeline.workers: 2
+    - pipeline.id: security
+      path.config: "/usr/share/logstash/pipeline/security.conf"
+      pipeline.workers: 1
+    - pipeline.id: business-metrics
+      path.config: "/usr/share/logstash/pipeline/business-metrics.conf"
+      pipeline.workers: 1
+      
+  main.conf: |
+    input {
+      beats {
+        port => 5044
+      }
+      
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "church-*"
+        query => '{"query": {"range": {"@timestamp": {"gte": "now-5m"}}}}'
+        schedule => "* * * * *"
+        codec => "json"
+      }
+    }
+    
+    filter {
+      # Parse JSON logs
+      if [message] =~ /^\{.*\}$/ {
+        json {
+          source => "message"
+        }
+      }
+      
+      # Grok parsing for structured logs
+      grok {
+        match => { 
+          "message" => "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:log_message}"
+        }
+      }
+      
+      # Date parsing
+      date {
+        match => [ "timestamp", "ISO8601" ]
+        target => "@timestamp"
+      }
+      
+      # Tenant extraction
+      if [log_message] {
+        grok {
+          match => { 
+            "log_message" => ".*tenant[_-]id[\"':%s]*(?<tenant_id>[%w-]+)"
+          }
+          tag_on_failure => ["_tenant_parse_failure"]
+        }
+      }
+      
+      # Performance metrics extraction
+      if [log_message] =~ /response_time|duration|latency/ {
+        grok {
+          match => { 
+            "log_message" => ".*(?:response_time|duration|latency)[\"':%s]*(?<response_time_ms>[%d%.]+)"
+          }
+          tag_on_failure => ["_performance_parse_failure"]
+        }
+        
+        if [response_time_ms] {
+          mutate {
+            convert => { "response_time_ms" => "float" }
+          }
+          
+          # Add performance categories
+          if [response_time_ms] < 100 {
+            mutate { add_field => { "performance_category" => "fast" } }
+          } else if [response_time_ms] < 1000 {
+            mutate { add_field => { "performance_category" => "normal" } }
+          } else if [response_time_ms] < 5000 {
+            mutate { add_field => { "performance_category" => "slow" } }
+          } else {
+            mutate { add_field => { "performance_category" => "very_slow" } }
+          }
+        }
+      }
+      
+      # Error categorization
+      if [level] in ["ERROR", "CRITICAL", "FATAL"] {
+        mutate {
+          add_field => { "alert_priority" => "high" }
+          add_tag => ["error_event"]
+        }
+        
+        # Categorize errors
+        if [log_message] =~ /database|db|sql/ {
+          mutate { add_field => { "error_category" => "database" } }
+        } else if [log_message] =~ /timeout|timed out/ {
+          mutate { add_field => { "error_category" => "timeout" } }
+        } else if [log_message] =~ /memory|oom|out of memory/ {
+          mutate { add_field => { "error_category" => "memory" } }
+        } else if [log_message] =~ /authentication|auth|unauthorized/ {
+          mutate { add_field => { "error_category" => "authentication" } }
+        } else {
+          mutate { add_field => { "error_category" => "general" } }
+        }
+      }
+      
+      # Add environment context
+      mutate {
+        add_field => { 
+          "environment" => "production"
+          "platform" => "kubernetes"
+          "cluster" => "visionary-church-production"
+        }
+      }
+      
+      # GeoIP lookup for security events
+      if [client_ip] {
+        geoip {
+          source => "client_ip"
+          target => "geoip"
+        }
+      }
+    }
+    
+    output {
+      # Main logs to Elasticsearch
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "church-logs-%{+YYYY.MM.dd}"
+        template_name => "church-logs"
+        template_pattern => "church-logs-*"
+        template_overwrite => true
+      }
+      
+      # High-priority alerts to separate index
+      if "error_event" in [tags] or [alert_priority] == "high" {
+        elasticsearch {
+          hosts => ["elasticsearch:9200"]
+          index => "church-alerts-%{+YYYY.MM.dd}"
+        }
+      }
+      
+      # Performance metrics to dedicated index
+      if [performance_category] {
+        elasticsearch {
+          hosts => ["elasticsearch:9200"]
+          index => "church-performance-%{+YYYY.MM.dd}"
+        }
+      }
+      
+      # Debug output (remove in production)
+      # stdout { codec => rubydebug }
+    }
+    
+  security.conf: |
+    input {
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "church-security-*"
+        query => '{"query": {"bool": {"should": [{"match": {"security_event": true}}, {"match": {"level": "ERROR"}}]}}}'
+        schedule => "* * * * *"
+        codec => "json"
+      }
+    }
+    
+    filter {
+      # Security event enrichment
+      if [security_event] {
+        # IP reputation check (mock - integrate with real service)
+        if [client_ip] {
+          mutate {
+            add_field => { "ip_reputation" => "unknown" }
+          }
+        }
+        
+        # Failed login aggregation
+        if [log_message] =~ /failed login|authentication failed/ {
+          aggregate {
+            task_id => "%{client_ip}"
+            code => "
+              map['failed_attempts'] ||= 0
+              map['failed_attempts'] += 1
+              map['first_attempt'] ||= event.get('@timestamp')
+              map['last_attempt'] = event.get('@timestamp')
+              event.set('total_failed_attempts', map['failed_attempts'])
+            "
+            push_map_as_event_on_timeout => true
+            timeout => 300
+            timeout_tags => ['_aggregate_timeout']
+            inactivity_timeout => 60
+          }
+        }
+        
+        # Brute force detection
+        if [total_failed_attempts] and [total_failed_attempts] > 10 {
+          mutate {
+            add_field => { "security_alert" => "brute_force_detected" }
+            add_field => { "alert_severity" => "critical" }
+            add_tag => ["security_incident"]
+          }
+        }
+      }
+    }
+    
+    output {
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "church-security-incidents-%{+YYYY.MM.dd}"
+      }
+      
+      # Send critical security alerts to external system
+      if "security_incident" in [tags] {
+        http {
+          url => "https://alerts.visionarychurch.ai/security-webhook"
+          http_method => "post"
+          format => "json"
+          headers => {
+            "Authorization" => "Bearer ${SECURITY_WEBHOOK_TOKEN}"
+            "Content-Type" => "application/json"
+          }
+        }
+      }
+    }
+    
+  business-metrics.conf: |
+    input {
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "church-app-*"
+        query => '{"query": {"exists": {"field": "business_event"}}}'
+        schedule => "*/5 * * * *"
+        codec => "json"
+      }
+    }
+    
+    filter {
+      # Business metrics aggregation
+      if [business_event] {
+        # Tenant-based metrics
+        aggregate {
+          task_id => "%{tenant_id}_%{business_event}"
+          code => "
+            map['event_count'] ||= 0
+            map['event_count'] += 1
+            map['tenant_id'] = event.get('tenant_id')
+            map['business_event'] = event.get('business_event')
+            event.set('tenant_event_count', map['event_count'])
+          "
+          push_map_as_event_on_timeout => true
+          timeout => 300
+          timeout_tags => ['_business_metrics']
+        }
+        
+        # Revenue tracking
+        if [monetary_amount] {
+          aggregate {
+            task_id => "%{tenant_id}_revenue"
+            code => "
+              map['total_revenue'] ||= 0
+              map['total_revenue'] += event.get('monetary_amount').to_f
+              map['transaction_count'] ||= 0
+              map['transaction_count'] += 1
+              event.set('tenant_total_revenue', map['total_revenue'])
+              event.set('tenant_transaction_count', map['transaction_count'])
+            "
+            push_map_as_event_on_timeout => true
+            timeout => 900
+            timeout_tags => ['_revenue_metrics']
+          }
+        }
+      }
+    }
+    
+    output {
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "church-business-metrics-%{+YYYY.MM.dd}"
+      }
+      
+      # Send metrics to external analytics system
+      http {
+        url => "https://analytics.visionarychurch.ai/metrics-webhook"
+        http_method => "post"
+        format => "json"
+        headers => {
+          "Authorization" => "Bearer ${ANALYTICS_WEBHOOK_TOKEN}"
+          "Content-Type" => "application/json"
+        }
+      }
+    }

@@ -1,0 +1,372 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* VisionaryChurch.ai Brand Typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&display=swap');
+
+@layer base {
+  /* Brand CSS Custom Properties */
+  :root {
+    /* Brand Colors */
+    --brand-primary: #3B82F6;
+    --brand-primary-50: #EFF6FF;
+    --brand-primary-500: #3B82F6;
+    --brand-primary-600: #2563EB;
+    --brand-primary-700: #1D4ED8;
+    
+    --brand-secondary: #9333EA;
+    --brand-secondary-50: #FAF5FF;
+    --brand-secondary-500: #A855F7;
+    --brand-secondary-600: #9333EA;
+    
+    --brand-accent: #F59E0B;
+    --brand-accent-50: #FFFBEB;
+    --brand-accent-500: #F59E0B;
+    
+    --brand-supporting: #14B8A6;
+    --brand-supporting-50: #F0FDFA;
+    --brand-supporting-500: #14B8A6;
+    
+    /* Typography */
+    --font-brand: 'Inter', system-ui, sans-serif;
+    --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-serif: 'Crimson Text', serif;
+    
+    /* Spacing */
+    --spacing-unit: 4px;
+    
+    /* Borders */
+    --border-radius-brand: 8px;
+    --border-radius-card: 12px;
+    --border-radius-button: 6px;
+    
+    /* Shadows */
+    --shadow-brand: 0 4px 14px 0 rgba(59, 130, 246, 0.15);
+    --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  body {
+    @apply bg-white text-gray-900 antialiased;
+    font-family: var(--font-brand);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Brand typography hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+  
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+  }
+  
+  h2 {
+    @apply text-3xl md:text-4xl;
+  }
+  
+  h3 {
+    @apply text-2xl md:text-3xl;
+  }
+  
+  p {
+    @apply leading-relaxed;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+@layer components {
+  /* VisionaryChurch.ai Brand Components */
+  
+  /* Enhanced Button System */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    border-radius: var(--border-radius-button);
+    font-family: var(--font-brand);
+  }
+  
+  /* Primary Brand Button */
+  .btn-brand {
+    @apply btn bg-brand-primary-600 text-white hover:bg-brand-primary-700 focus:ring-brand-primary-500 shadow-brand;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-600) 100%);
+  }
+  
+  .btn-brand:hover {
+    background: linear-gradient(135deg, var(--brand-primary-600) 0%, var(--brand-primary-700) 100%);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-brand), 0 8px 25px -8px rgba(59, 130, 246, 0.5);
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-primary-600 text-white hover:bg-brand-primary-700 focus:ring-brand-primary-500 shadow-sm;
+  }
+  
+  /* Church Context Buttons */
+  .btn-worship {
+    @apply btn bg-brand-secondary-600 text-white hover:bg-brand-secondary-700 focus:ring-brand-secondary-500;
+  }
+  
+  .btn-community {
+    @apply btn bg-brand-supporting-600 text-white hover:bg-brand-supporting-700 focus:ring-brand-supporting-500;
+  }
+  
+  .btn-growth {
+    @apply btn bg-brand-accent-600 text-white hover:bg-brand-accent-700 focus:ring-brand-accent-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500;
+  }
+
+  .btn-outline {
+    @apply btn border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
+  }
+  
+  .btn-outline-brand {
+    @apply btn border-2 border-brand-primary-500 text-brand-primary-600 hover:bg-brand-primary-50 focus:ring-brand-primary-500;
+  }
+
+  .btn-ghost {
+    @apply btn text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-500;
+  }
+  
+  /* Button sizes */
+  .btn-xs {
+    @apply px-2 py-1 text-xs;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+  
+  .btn-md {
+    @apply px-4 py-2 text-sm;
+  }
+  
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+  
+  .btn-xl {
+    @apply px-8 py-4 text-lg;
+  }
+
+  /* Enhanced Input System */
+  .input {
+    @apply block w-full border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 shadow-sm focus:border-brand-primary-500 focus:ring-1 focus:ring-brand-primary-500 transition-all duration-200;
+    border-radius: var(--border-radius-brand);
+    font-family: var(--font-brand);
+  }
+  
+  .input:focus {
+    box-shadow: 0 0 0 1px var(--brand-primary), 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  }
+  
+  .input-brand {
+    @apply input focus:border-brand-primary-500 focus:ring-brand-primary-500;
+  }
+  
+  .input-error {
+    @apply input border-red-300 focus:border-red-500 focus:ring-red-500;
+  }
+  
+  .input-success {
+    @apply input border-green-300 focus:border-green-500 focus:ring-green-500;
+  }
+
+  /* Enhanced Card System */
+  .card {
+    @apply bg-white border border-gray-200 p-6;
+    border-radius: var(--border-radius-card);
+    box-shadow: var(--shadow-card);
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+  
+  .card-brand {
+    @apply card border-brand-primary-200;
+    box-shadow: var(--shadow-brand);
+  }
+  
+  .card-elevated {
+    @apply card shadow-lg;
+  }
+  
+  .card-interactive {
+    @apply card cursor-pointer hover:shadow-brand hover:border-brand-primary-300;
+  }
+  
+  .card-church {
+    @apply card;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.02) 0%, rgba(147, 51, 234, 0.02) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.1);
+  }
+
+  /* Brand Gradient System */
+  .gradient-brand {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-600) 100%);
+  }
+  
+  .gradient-brand-reverse {
+    background: linear-gradient(135deg, var(--brand-primary-600) 0%, var(--brand-primary) 100%);
+  }
+  
+  .gradient-primary {
+    @apply bg-gradient-to-r from-brand-primary-600 to-brand-primary-700;
+  }
+
+  .gradient-church {
+    background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--brand-primary) 50%, var(--brand-supporting) 100%);
+  }
+  
+  .gradient-worship {
+    background: linear-gradient(135deg, var(--brand-secondary) 0%, var(--brand-secondary-600) 100%);
+  }
+  
+  .gradient-community {
+    background: linear-gradient(135deg, var(--brand-supporting) 0%, var(--brand-supporting-600) 100%);
+  }
+  
+  .gradient-growth {
+    background: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-accent-600) 100%);
+  }
+  
+  .gradient-text-brand {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Brand Animation Components */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  .animate-fade-in-up {
+    animation: fadeIn 0.6s ease-out, slideUp 0.6s ease-out;
+  }
+
+  /* Brand Loading Components */
+  .spinner {
+    @apply animate-spin rounded-full border-2 border-gray-300;
+    border-top-color: var(--brand-primary);
+  }
+  
+  .spinner-brand {
+    @apply animate-spin rounded-full border-2;
+    border-color: rgba(59, 130, 246, 0.2);
+    border-top-color: var(--brand-primary);
+  }
+
+  /* Brand Glow Effects */
+  .glow {
+    box-shadow: var(--shadow-glow);
+  }
+  
+  .glow-brand {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+  
+  .glow-church {
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.4);
+  }
+  
+  .glow-warm {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+  }
+}
+
+@layer utilities {
+  /* Brand Utility Classes */
+
+  /* Glass Morphism Effects */
+  .glass {
+    @apply backdrop-blur-sm bg-white/30 border border-white/20;
+    backdrop-filter: blur(10px) saturate(180%);
+  }
+
+  .glass-dark {
+    @apply backdrop-blur-sm bg-gray-900/30 border border-gray-700/20;
+    backdrop-filter: blur(10px) saturate(180%);
+  }
+  
+  .glass-brand {
+    background: rgba(59, 130, 246, 0.1);
+    backdrop-filter: blur(10px) saturate(180%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+  }
+
+  /* Scrollbar hide */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Brand Text Effects */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .text-brand {
+    color: var(--brand-primary);
+  }
+  
+  .text-church {
+    color: var(--brand-secondary);
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}

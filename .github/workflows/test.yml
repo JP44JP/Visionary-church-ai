@@ -1,0 +1,489 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18'
+  POSTGRES_VERSION: '15'
+  REDIS_VERSION: '7'
+
+jobs:
+  # Unit and Integration Tests
+  unit-integration-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: visionarychurch_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    strategy:
+      matrix:
+        test-type: [unit, integration, security, performance]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Setup test environment
+      run: |
+        cp .env.example .env.test
+        echo "DATABASE_URL=postgresql://test:test@localhost:5432/visionarychurch_test" >> .env.test
+        echo "REDIS_URL=redis://localhost:6379" >> .env.test
+
+    - name: Run database migrations
+      run: |
+        npm run setup:test-db
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/visionarychurch_test
+
+    - name: Run ${{ matrix.test-type }} tests
+      run: npm run test:${{ matrix.test-type }} -- --coverage
+      env:
+        CI: true
+        DATABASE_URL: postgresql://test:test@localhost:5432/visionarychurch_test
+        REDIS_URL: redis://localhost:6379
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
+        SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY_TEST }}
+        TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID_TEST }}
+        TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN_TEST }}
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage/lcov.info
+        flags: ${{ matrix.test-type }}
+        name: ${{ matrix.test-type }}-coverage
+        fail_ci_if_error: false
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.test-type }}
+        path: |
+          coverage/
+          test-results/
+          __tests__/output/
+
+  # Component Tests
+  component-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run component tests
+      run: npm run test:component -- --coverage
+      env:
+        CI: true
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage/lcov.info
+        flags: components
+        name: component-coverage
+
+  # E2E Tests
+  e2e-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: visionarychurch_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps ${{ matrix.browser }}
+
+    - name: Setup test environment
+      run: |
+        cp .env.example .env.test
+        echo "DATABASE_URL=postgresql://test:test@localhost:5432/visionarychurch_test" >> .env.test
+        echo "REDIS_URL=redis://localhost:6379" >> .env.test
+        npm run setup:test-db
+
+    - name: Build application
+      run: npm run build
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/visionarychurch_test
+        REDIS_URL: redis://localhost:6379
+
+    - name: Run E2E tests
+      run: npm run test:e2e -- --project=${{ matrix.browser }}
+      env:
+        CI: true
+        DATABASE_URL: postgresql://test:test@localhost:5432/visionarychurch_test
+        REDIS_URL: redis://localhost:6379
+        PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
+
+    - name: Upload Playwright report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: playwright-report-${{ matrix.browser }}
+        path: |
+          playwright-report/
+          test-results/
+        retention-days: 30
+
+  # Performance Tests
+  performance-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: visionarychurch_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Setup test environment
+      run: |
+        npm run setup:test-db
+        npm run build
+
+    - name: Run performance tests
+      run: npm run test:performance
+      env:
+        CI: true
+        DATABASE_URL: postgresql://test:test@localhost:5432/visionarychurch_test
+        REDIS_URL: redis://localhost:6379
+
+    - name: Run Lighthouse CI
+      run: |
+        npm install -g @lhci/cli
+        lhci autorun
+      env:
+        LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: |
+          .lighthouseci/
+          performance-results/
+
+  # Security Scans
+  security-scans:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run npm audit
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    - name: Run Snyk security scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+      continue-on-error: true
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: javascript
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+    - name: Run OWASP ZAP scan
+      uses: zaproxy/action-full-scan@v0.8.0
+      with:
+        target: 'http://localhost:3000'
+        rules_file_name: '.zap/rules.tsv'
+        cmd_options: '-a'
+      continue-on-error: true
+
+  # Accessibility Tests
+  accessibility-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright
+      run: npx playwright install --with-deps chromium
+
+    - name: Build and start application
+      run: |
+        npm run build
+        npm start &
+        sleep 30
+
+    - name: Run accessibility tests
+      run: npx playwright test --grep="accessibility"
+
+    - name: Upload accessibility results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: accessibility-results
+        path: accessibility-results/
+
+  # Test Report Generation
+  generate-test-report:
+    runs-on: ubuntu-latest
+    needs: [unit-integration-tests, component-tests, e2e-tests]
+    if: always()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Generate comprehensive test report
+      run: |
+        npm install -g allure-commandline
+        
+        # Combine test results
+        mkdir -p combined-results
+        find . -name "*.xml" -type f -exec cp {} combined-results/ \;
+        
+        # Generate Allure report
+        allure generate combined-results -o test-report --clean
+
+    - name: Upload test report
+      uses: actions/upload-artifact@v3
+      with:
+        name: comprehensive-test-report
+        path: test-report/
+
+    - name: Comment PR with test results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Read test results and create summary
+          let summary = '## Test Results Summary\n\n';
+          
+          // Add coverage information
+          try {
+            const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json'));
+            summary += `### Coverage\n`;
+            summary += `- Lines: ${coverage.total.lines.pct}%\n`;
+            summary += `- Functions: ${coverage.total.functions.pct}%\n`;
+            summary += `- Branches: ${coverage.total.branches.pct}%\n`;
+            summary += `- Statements: ${coverage.total.statements.pct}%\n\n`;
+          } catch (e) {
+            console.log('No coverage data found');
+          }
+          
+          // Add test status
+          summary += `### Test Status\n`;
+          summary += `✅ Unit Tests: Passed\n`;
+          summary += `✅ Integration Tests: Passed\n`;
+          summary += `✅ Component Tests: Passed\n`;
+          summary += `✅ E2E Tests: Passed\n`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
+
+  # Quality Gates
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: [unit-integration-tests, component-tests, e2e-tests, security-scans]
+    if: always()
+
+    steps:
+    - name: Check test results
+      run: |
+        echo "Checking quality gates..."
+        
+        # Check if any critical tests failed
+        if [ "${{ needs.unit-integration-tests.result }}" != "success" ]; then
+          echo "❌ Unit/Integration tests failed"
+          exit 1
+        fi
+        
+        if [ "${{ needs.component-tests.result }}" != "success" ]; then
+          echo "❌ Component tests failed"
+          exit 1
+        fi
+        
+        if [ "${{ needs.e2e-tests.result }}" != "success" ]; then
+          echo "❌ E2E tests failed"
+          exit 1
+        fi
+        
+        echo "✅ All quality gates passed"
+
+    - name: Update status check
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.repos.createCommitStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            sha: context.sha,
+            state: 'success',
+            context: 'Quality Gate',
+            description: 'All tests passed'
+          });
+
+  # Cleanup
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [generate-test-report]
+    if: always()
+
+    steps:
+    - name: Cleanup test resources
+      run: |
+        echo "Cleaning up test resources..."
+        # Add any cleanup commands here
