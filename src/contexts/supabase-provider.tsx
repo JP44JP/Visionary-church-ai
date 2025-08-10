@@ -1,13 +1,12 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { createClientComponentClient, type Session } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient, type Session, type User as SupabaseUser } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
-import { Database } from '@/types/supabase'
 import { User } from '@/types'
 
 type SupabaseContext = {
-  supabase: ReturnType<typeof createClientComponentClient<Database>>
+  supabase: ReturnType<typeof createBrowserClient>
   session: Session | null
   user: User | null
   loading: boolean
@@ -25,7 +24,10 @@ export function SupabaseProvider({
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClientComponentClient<Database>()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   useEffect(() => {
     const getSession = async () => {

@@ -1,7 +1,6 @@
-import { createClientComponentClient, createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient, createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-import { Database } from '@/types/supabase'
 
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -10,15 +9,25 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 // Client-side Supabase client
 export const createClientSupabaseClient = () =>
-  createClientComponentClient<Database>()
+  createBrowserClient(supabaseUrl, supabaseAnonKey)
 
 // Server-side Supabase client
 export const createServerSupabaseClient = () =>
-  createServerComponentClient<Database>({ cookies })
+  createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        get(name: string) {
+          return cookies().get(name)?.value
+        },
+      },
+    }
+  )
 
 // Service role client (for admin operations)
 export const createServiceSupabaseClient = () =>
-  createClient<Database>(supabaseUrl, supabaseServiceKey, {
+  createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
@@ -27,7 +36,7 @@ export const createServiceSupabaseClient = () =>
 
 // Public client (no auth required)
 export const createPublicSupabaseClient = () =>
-  createClient<Database>(supabaseUrl, supabaseAnonKey)
+  createClient(supabaseUrl, supabaseAnonKey)
 
 // Default export for client-side usage
 export const supabase = createClientSupabaseClient()
@@ -85,8 +94,8 @@ export const getChurchBySlug = async (slug: string) => {
 }
 
 // Real-time subscriptions
-export const subscribeToTable = <T extends keyof Database['public']['Tables']>(
-  table: T,
+export const subscribeToTable = (
+  table: string,
   callback: (payload: any) => void,
   filter?: string
 ) => {
